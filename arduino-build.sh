@@ -1,0 +1,253 @@
+#!/bin/bash
+set -e
+
+################################ Project ######################################
+
+PROJECT=firmware-arduino-nicla-vision
+
+# used for grepping
+ARDUINO_CORE="arduino:mbed_nicla"
+ARDUINO_CORE_VERSION="3.2.0"
+
+BOARD="${ARDUINO_CORE}":nicla_vision
+
+# declare associative array pre bash 4 style
+ARDUINO_LIBS=(
+"VL53L1X=1.3.1"            # proximity sensor library
+"STM32duino LSM6DSOX=2.3.0"   # Inertial sensor library
+)
+
+###############################################################################
+
+COMMAND=$1
+if [ -z "$ARDUINO_CLI" ]; then
+    ARDUINO_CLI=$(which arduino-cli || true)
+fi
+DIRNAME="$(basename "$SCRIPTPATH")"
+EXPECTED_CLI_MAJOR=0
+EXPECTED_CLI_MINOR=18
+
+CLI_MAJOR=$($ARDUINO_CLI version | cut -d. -f1 | rev | cut -d ' '  -f1)
+CLI_MINOR=$($ARDUINO_CLI version | cut -d. -f2)
+CLI_REV=$($ARDUINO_CLI version | cut -d. -f3 | cut -d ' '  -f1)
+
+################################ Parse args ###################################
+OPT_BUILD=0
+OPT_FLASH=0
+OPT_SKIP_DEPENDENCY_CHECK=0
+
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --build)
+      OPT_BUILD=1
+      shift # past argument
+      ;;
+    --flash)
+      OPT_FLASH=1
+      shift # past argument
+      ;;
+    --all)
+      OPT_BUILD=1
+      OPT_FLASH=1
+      shift # past argument
+      ;;
+    --skip-dependency-check)
+      OPT_SKIP_DEPENDENCY_CHECK=1
+      shift # past argument
+      ;;
+    -*|--*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1") # save positional arg
+      shift # past argument
+      ;;
+  esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+################################ Helper Funcs #################################
+
+# parses Arduino CLI's (core list and lib list) output and returns the installed version.
+# Expected format (spaces can vary):
+#    <package/core>   <installed version>  <latest version>  <other>
+#
+parse_installed() {
+    echo "${1}" | awk -F " " '{print $2}' || true
+}
+
+# finds a Arduino core installed and returns the version
+# otherwise it returns empty string
+#
+find_arduino_core() {
+    core=$1
+    version=$2
+    result=""
+    # space intentional
+    line="$($ARDUINO_CLI core list | grep "${core} " || true)"
+    if [ -n "$line" ]; then
+        installed="$(parse_installed "${line}")"
+        if [ "$version" = "$installed" ]; then
+           result="$installed"
+        fi
+    fi
+    echo $result
+}
+
+# finds a Arduino library installed and returns the version
+# otherwise it returns empty string
+#
+find_arduino_lib() {
+    lib=$1
+    version=$2
+    result=""
+    # space intentional
+    line="$($ARDUINO_CLI lib list | grep "${lib} " || true)"
+    if [ -n "$line" ]; then
+        echo $line
+        installed="$(parse_installed "${line}")"
+        if [ "$version" = "$installed" ]; then
+           result="$installed"
+        fi
+    fi
+    echo $result
+}
+
+array_get_key() {
+    echo "${1%%=*}"
+}
+
+array_get_value() {
+    echo "${1#*=}"
+}
+
+############################# Installing Deps #################################
+
+check_dependency()
+{
+    if [ ! -x "$ARDUINO_CLI" ]; then
+        echo "Cannot find 'arduino-cli' in your PATH. Install the Arduino CLI before you continue."
+        echo "Installation instructions: https://arduino.github.io/arduino-cli/latest/"
+        exit 1
+    fi
+
+    if (( CLI_MINOR < EXPECTED_CLI_MINOR)); then
+        echo "You need to upgrade your Arduino CLI version (now: $CLI_MAJOR.$CLI_MINOR.$CLI_REV, but required: $EXPECTED_CLI_MAJOR.$EXPECTED_CLI_MINOR.x or higher)"
+        echo "See https://arduino.github.io/arduino-cli/installation/ for upgrade instructions"
+        exit 1
+    fi
+
+    if (( CLI_MAJOR != EXPECTED_CLI_MAJOR || CLI_MINOR != EXPECTED_CLI_MINOR )); then
+        echo "You're using an untested version of Arduino CLI, this might cause issues (found: $CLI_MAJOR.$CLI_MINOR.$CLI_REV, expected: $EXPECTED_CLI_MAJOR.$EXPECTED_CLI_MINOR.x)"
+    fi
+
+    echo ""
+    echo "Checking Core dependencies..."
+    echo ""
+
+    has_arduino_core="$(find_arduino_core "${ARDUINO_CORE}" "${ARDUINO_CORE_VERSION}")"
+    if [ -z "$has_arduino_core" ]; then
+        echo -e "${ARDUINO_CORE}@${ARDUINO_CORE_VERSION}\tNot Found!"
+        echo -e "\tInstalling ${ARDUINO_CORE}@${ARDUINO_CORE_VERSION}..."
+        $ARDUINO_CLI core update-index
+        #$ARDUINO_CLI core update-index --additional-urls https://downloads.arduino.cc/packages/package_staging_index.json
+        $ARDUINO_CLI core install "${ARDUINO_CORE}@${ARDUINO_CORE_VERSION}"
+        echo -e "\tInstalling ${ARDUINO_CORE}@${ARDUINO_CORE_VERSION} OK"
+    else
+        echo -e "${ARDUINO_CORE}@${ARDUINO_CORE_VERSION}\tFound!"
+    fi
+
+    echo ""
+    echo "Checking Core dependencies OK"
+    echo ""
+    echo "Checking Library dependencies..."
+    echo ""
+
+    lib_update=""
+    for lib in "${ARDUINO_LIBS[@]}"; do
+        key=$(array_get_key "${lib}")
+        value=$(array_get_value "$lib")
+        has_arduino_lib="$(find_arduino_lib "${key}" "${value}")"
+        if [ -n "$has_arduino_lib" ]; then
+            echo -e "${key}@${value}\tFound!"
+        else
+            echo -e "${key}@${value}\tNot Found!"
+            echo -e "\tInstalling ${key}@${value} library..."
+
+        if [ -z  "$lib_update" ]; then
+            $ARDUINO_CLI lib update-index
+            lib_update="once"
+        fi
+            $ARDUINO_CLI lib install "${key}"@"${value}"
+            echo -e "\tInstalling ${key}@${value} library OK"
+        fi
+    done
+
+    echo ""
+    echo "Checking Library dependencies OK"
+    echo ""
+}
+
+############################### Build Deps #####################################
+
+# CLI v0.14 updates the name of this to --build-property
+if ((CLI_MAJOR >= 0 && CLI_MINOR >= 14)); then
+    BUILD_PROPERTIES_FLAG=--build-property
+else
+    BUILD_PROPERTIES_FLAG=--build-properties
+fi
+
+INCLUDE="-I ./src"
+INCLUDE+=" -I./src/model-parameters"
+INCLUDE+=" -I ./src/inference"
+INCLUDE+=" -I ./src/ingestion-sdk-c/"
+INCLUDE+=" -I ./src/ingestion-sdk-c/inc"
+INCLUDE+=" -I ./src/ingestion-sdk-c/inc/signing"
+INCLUDE+=" -I ./src/ingestion-sdk-platform/nicla-vision"
+INCLUDE+=" -I ./src/sensors"
+INCLUDE+=" -I ./src/QCBOR/inc"
+INCLUDE+=" -I ./src/QCBOR/src"
+INCLUDE+=" -I ./src/mbedtls_hmac_sha256_sw/"
+INCLUDE+=" -I ./src/firmware-sdk/"
+INCLUDE+=" -I ./src/firmware-sdk/at-server/"
+
+FLAGS+=" -DMBED_HEAP_STATS_ENABLED=1"
+FLAGS+=" -DMBED_STACK_STATS_ENABLED=1"
+FLAGS+=" -O3"
+FLAGS+=" -g3"
+FLAGS+=" -DEI_SENSOR_AQ_STREAM=FILE"
+FLAGS+=" -DEIDSP_QUANTIZE_FILTERBANK=0"
+FLAGS+=" -DEI_CLASSIFIER_SLICES_PER_MODEL_WINDOW=4"
+FLAGS+=" -DEIDSP_USE_CMSIS_DSP=1"
+FLAGS+=" -DEIDSP_LOAD_CMSIS_DSP_SOURCES=1"
+FLAGS+=" -DEI_CLASSIFIER_TFLITE_ENABLE_CMSIS_NN=1"
+#FLAGS+=" -DEI_CLASSIFIER_ALLOCATION_STATIC" # heap suffers from fragmentation, statically allocating helps
+
+if [ "$OPT_BUILD" -eq 1 ]; then
+    echo "Building $PROJECT"
+    if [ "$OPT_SKIP_DEPENDENCY_CHECK" -ne 1 ]; then
+        check_dependency
+    fi
+    $ARDUINO_CLI compile --fqbn  $BOARD $BUILD_PROPERTIES_FLAG build.extra_flags="$INCLUDE $FLAGS" --output-dir . &
+    pid=$! # Process Id of the previous running command
+    while kill -0 $pid 2>/dev/null
+    do
+        echo "Still building..."
+        sleep 2
+    done
+    wait $pid
+    ret=$?
+    if [ $ret -eq 0 ]; then
+        echo "Building $PROJECT done"
+    else
+        exit "Building $PROJECT failed"
+    fi
+fi
+
+if [ "$OPT_FLASH" -eq 1 ]; then
+    $ARDUINO_CLI upload -p $($ARDUINO_CLI board list | grep Arduino | cut -d ' ' -f1) --fqbn $BOARD --input-dir .
+fi
