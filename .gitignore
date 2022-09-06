@@ -1,6 +1,7 @@
 *.bin
 *.elf
-src/edge-impulse-sdk/
-src/firmware-sdk/
 *.hex
 *.map
+
+/.vscode
+.DS_Store
