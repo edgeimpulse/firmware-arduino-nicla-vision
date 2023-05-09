@@ -60,6 +60,10 @@ mbed::Ticker fusion_sample_rate;
 static bool get_wifi_connection_status_c(void);
 static bool get_wifi_present_status_c(void);
 
+#if MULTI_FREQ_ENABLED == 1
+static void multi_sample_thread(void);
+#endif
+
 /* Public functions -------------------------------------------------------- */
 EiDeviceNiclaVision::EiDeviceNiclaVision(EiDeviceMemory* mem)
 {
@@ -251,6 +255,41 @@ bool EiDeviceNiclaVision::stop_sample_thread(void)
     return true;
 }
 
+#if MULTI_FREQ_ENABLED == 1
+/**
+ * 
+ */
+bool EiDeviceNiclaVision::start_multi_sample_thread(void (*sample_multi_read_cb)(uint8_t), float* multi_sample_interval_ms, uint8_t num_fusioned)
+{
+    uint8_t i;
+    uint8_t flag = 0;
+
+    this->sample_multi_read_callback = sample_multi_read_cb;
+    this->fusioning = num_fusioned;
+    this->multi_sample_interval.clear();
+
+    for (i = 0; i < num_fusioned; i++){
+        this->multi_sample_interval.push_back(1.f/multi_sample_interval_ms[i]*1000.f);
+    }
+
+    /* to improve, we consider just a 2 sensors case for now */
+    this->sample_interval = ei_fusion_calc_multi_gcd(this->multi_sample_interval.data(), this->fusioning);
+
+    /* force first reading */
+    for (i = 0; i < this->fusioning; i++){
+            flag |= (1<<i);
+    }
+    this->sample_multi_read_callback(flag);
+
+    this->actual_timer = 0;
+
+    fusion_thread.start(callback(&fusion_queue, &EventQueue::dispatch_forever));
+    fusion_sample_rate.attach(fusion_queue.event(multi_sample_thread), (this->sample_interval/1000.0f));
+
+    return true;
+}
+#endif
+
 uint32_t EiDeviceNiclaVision::get_data_output_baudrate(void)
 {
     return MAX_BAUD;
@@ -343,15 +382,6 @@ char ei_get_serial_byte(void) {
     return Serial.read();
 }
 
-/**
- * @brief      Write character to serial
- *
- * @param      cChar     Char addr to write
- */
-void ei_putc(char cChar) {
-    Serial.write(&cChar, 1);
-}
-
 /* Private functions ------------------------------------------------------- */
 
 static bool get_wifi_connection_status_c(void)
@@ -384,3 +414,30 @@ void print_buf(const uint8_t *buf, size_t len)
             ei_printf(" ");
     }
 }
+
+#if MULTI_FREQ_ENABLED == 1
+/**
+ * @brief Thread that handles the multi fusion sampling
+ * 
+ */
+static void multi_sample_thread(void)
+{
+    EiDeviceNiclaVision *dev = static_cast<EiDeviceNiclaVision*>(EiDeviceInfo::get_device());
+
+    uint8_t flag = 0;
+    uint8_t i = 0;
+    
+    dev->actual_timer += dev->get_sample_interval();  /* update actual time */
+
+    for (i = 0; i < dev->get_fusioning(); i++){
+        if (((uint32_t)(dev->actual_timer % (uint32_t)dev->multi_sample_interval.at(i))) == 0) {   /* check if period of sensor is a multiple of actual time*/
+            flag |= (1<<i);                                                                     /* if so, time to sample it! */
+        }
+    }
+
+    if (dev->sample_multi_read_callback != nullptr){
+        dev->sample_multi_read_callback(flag);        
+    }    
+
+}
+#endif

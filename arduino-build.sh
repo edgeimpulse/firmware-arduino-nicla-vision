@@ -7,7 +7,7 @@ PROJECT=firmware-arduino-nicla-vision
 
 # used for grepping
 ARDUINO_CORE="arduino:mbed_nicla"
-ARDUINO_CORE_VERSION="3.2.0"
+ARDUINO_CORE_VERSION="3.4.1"
 
 BOARD="${ARDUINO_CORE}":nicla_vision
 

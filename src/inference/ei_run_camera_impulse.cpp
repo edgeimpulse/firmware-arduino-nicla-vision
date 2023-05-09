@@ -159,7 +159,7 @@ void ei_run_impulse(void)
         }
 
         ei_printf("Framebuffer: ");
-        base64_encode((char*)jpeg_buffer, out_size, ei_putc);
+        base64_encode((char*)jpeg_buffer, out_size, ei_putchar);
         ei_printf("\r\n");
 
         if (jpeg_buffer) {
@@ -183,7 +183,7 @@ void ei_run_impulse(void)
                 result.timing.dsp, result.timing.classification, result.timing.anomaly);
 #if EI_CLASSIFIER_OBJECT_DETECTION == 1
     bool bb_found = result.bounding_boxes[0].value > 0;
-    for (size_t ix = 0; ix < result.bounding_boxes_count; ix++) {
+    for (size_t ix = 0; ix < EI_CLASSIFIER_OBJECT_DETECTION_COUNT; ix++) {
         auto bb = result.bounding_boxes[ix];
         if (bb.value == 0) {
             continue;

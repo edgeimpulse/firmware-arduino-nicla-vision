@@ -85,6 +85,10 @@ public:
     uint32_t get_data_output_baudrate(void) override;
 	c_callback_status get_wifi_connection_status_function(void);
 	c_callback_status get_wifi_present_status_function(void);
+
+#if MULTI_FREQ_ENABLED == 1
+	bool start_multi_sample_thread(void (*sample_multi_read_cb)(uint8_t), float* multi_sample_interval_ms, uint8_t num_fusioned) override;		
+#endif
 	
 };
 

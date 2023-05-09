@@ -39,7 +39,7 @@ static const ei_device_fusion_sensor_t inertial_sensor = {
     // number of sensor module axis
     INERTIAL_AXIS_SAMPLED,
     // sampling frequencies
-    { 62.5f, 20.0f },
+    { 100.0f, 62.5f, 20.0f },
     // axis name and units payload (must be same order as read in)
     {
         { "accX", "m/s2" },

@@ -38,11 +38,12 @@ using namespace events;
 
 /* Private variables ------------------------------------------------------- */
 static uint32_t samples_required;
+static uint32_t samples_required_increase;
 static uint32_t current_sample;
 static uint32_t sample_buffer_size;
 static uint32_t headerOffset = 0;
 
-static char write_word_buf[4];
+static char write_word_buf[8];
 static int write_addr = 0;
 
 EI_SENSOR_AQ_STREAM stream;
@@ -53,10 +54,11 @@ static size_t ei_write(const void *buffer, size_t size, size_t count, EI_SENSOR_
 
     for(int i=0; i<count; i++) {
 
-        write_word_buf[write_addr&0x3] = *((char *)buffer++);
+        write_word_buf[write_addr&0x7] = *((char *)buffer++);
 
-        if((++write_addr & 0x03) == 0x00) {
-            mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr - 4) + headerOffset, 4);
+        if((++write_addr & 0x07) == 0x00) {
+            //mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr - 4) + headerOffset, 4);
+            mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr - 8) + headerOffset, 8);
         }
     }
     
@@ -88,22 +90,22 @@ static void ei_write_last_data(void)
     EiDeviceInfo* dev = EiDeviceInfo::get_device();
     EiDeviceMemory* mem = dev->get_memory();  
 
-    uint8_t fill = ((uint8_t)write_addr & 0x03);
+    uint8_t fill = ((uint8_t)write_addr & 0x07);
     uint8_t insert_end_address = 0;
 
     if (fill != 0x00) {
-        for (uint8_t i = fill; i < 4; i++) {
+        for (uint8_t i = fill; i < 8; i++) {
             write_word_buf[i] = 0xFF;
         }
-        mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr & ~0x03) + headerOffset, 4);
-        insert_end_address = 4;
+        mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr & ~0x07) + headerOffset, 7);
+        insert_end_address = 8;
     }
 
     /* Write appending word for end character */
-    for (uint8_t i = 0; i < 4; i++) {
+    for (uint8_t i = 0; i < 8; i++) {
         write_word_buf[i] = 0xFF;
     }
-    mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr & ~0x03) + headerOffset + insert_end_address, 4);
+    mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr & ~0x07) + headerOffset + insert_end_address, 8);
 }
 
 /* Private function prototypes --------------------------------------------- */
@@ -134,8 +136,10 @@ bool ei_sampler_start_sampling(void *v_ptr_payload, starter_callback ei_sample_s
     ei_printf("\tHMAC Key: %s\n", dev->get_sample_hmac_key().c_str());
     ei_printf("\tFile name: /fs/%s\n", dev->get_sample_label().c_str());
 
-    samples_required = (uint32_t)((dev->get_sample_length_ms()) / dev->get_sample_interval_ms());
-    sample_buffer_size = samples_required * sample_size * 2;
+    samples_required = (uint32_t)((float)dev->get_sample_length_ms());
+    samples_required_increase = (uint32_t)dev->get_sample_interval_ms();
+
+    sample_buffer_size = (samples_required/samples_required_increase) * sample_size * 2;
     current_sample = 0;
 
     // Minimum delay of 2000 ms for daemon
@@ -302,8 +306,9 @@ static void finish_and_upload(void)
 static bool sample_data_callback(const void *sample_buf, uint32_t byteLenght)
 {
     sensor_aq_add_data(&ei_mic_ctx, (float *)sample_buf, byteLenght / sizeof(float));
+    current_sample += samples_required_increase;
 
-    if (++current_sample >= samples_required) {
+    if(current_sample > samples_required) {
         return true;
     }
     else {

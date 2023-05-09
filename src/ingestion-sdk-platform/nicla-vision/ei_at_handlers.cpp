@@ -22,6 +22,7 @@
 
 #include "ei_at_handlers.h"
 #include "ei_device_lib.h"
+#include "at_base64_lib.h"
 
 #include "edge-impulse-sdk/porting/ei_classifier_porting.h"
 
@@ -29,6 +30,7 @@
 #include "ei_at_server.h"
 #include "ei_fusion.h"
 #include "ei_image_lib.h"
+#include "ei_device_interface.h"
 
 #include "ei_run_impulse.h"
 
@@ -39,6 +41,8 @@ using namespace std;
 
 EiDeviceNiclaVision* dev = static_cast<EiDeviceNiclaVision*>(EiDeviceNiclaVision::get_device());
 EiDeviceMemory* mem = dev->get_memory();
+
+#define TRANSFER_BUF_LEN 128
 
 // Helper functions
 
@@ -264,7 +268,7 @@ bool at_read_raw(const char **argv, const int argc)
                 ei_printf("\n");
             else
                 ei_printf(" ");
-        }  
+        }
     }
     ei_printf("\n");
 
@@ -309,6 +313,21 @@ bool at_run_impulse(void)
     ei_start_impulse(false, false);
 
     return true;
+}
+
+bool at_run_impulse_static_data(const char **argv, const int argc)
+{
+
+    if (check_args_num(2, argc) == false) {
+        return false;
+    }
+
+    bool debug = (argv[0][0] == 'y');
+    size_t length = (size_t)atoi(argv[1]);
+
+    bool res = run_impulse_static_data(debug, length, TRANSFER_BUF_LEN);
+
+    return res;
 }
 
 bool at_run_impulse_debug(const char **argv, const int argc)
@@ -376,7 +395,7 @@ static bool at_set_wifi(const char **argv, const int argc)
 
 bool at_get_snapshot(void)
 {
-    
+
     EiSnapshotProperties props;
 
     props = dev->get_snapshot_list();
@@ -482,10 +501,12 @@ bool at_get_config(void)
     ei_printf("\n");
     ei_printf("===== Inference ======\n");
     ei_printf("Sensor:           %d\r\n", EI_CLASSIFIER_SENSOR);
-#if EI_CLASSIFIER_OBJECT_DETECTION_CONSTRAINED == 1
-    const char *model_type = "constrained_object_detection";
-#elif EI_CLASSIFIER_OBJECT_DETECTION
-    const char *model_type = "object_detection";
+#if EI_CLASSIFIER_OBJECT_DETECTION
+    #if EI_CLASSIFIER_OBJECT_DETECTION_LAST_LAYER == EI_CLASSIFIER_LAST_LAYER_FOMO
+        const char *model_type = "constrained_object_detection";
+    #else
+        const char *model_type = "object_detection";
+    #endif
 #else
     const char *model_type = "classification";
 #endif
@@ -504,7 +525,7 @@ bool at_get_config(void)
     ei_printf("Connected: 0\n");
     ei_printf("Present:   0\n");
     ei_printf("\n");
-        
+
     ei_printf("===== Sampling parameters =====\n");
     ei_printf("Label:     %s\n", dev->get_sample_label().c_str());
     ei_printf("Interval:  %.2f ms.\n", dev->get_sample_interval_ms());
@@ -617,6 +638,13 @@ ATServer *ei_at_init(EiDeviceNiclaVision *device)
         nullptr,
         nullptr,
         nullptr);
+    at->register_command(
+        AT_RUNIMPULSESTATIC,
+        AT_RUNIMPULSESTATIC_HELP_TEXT,
+        nullptr,
+        nullptr,
+        at_run_impulse_static_data,
+        AT_RUNIMPULSESTATIC_ARGS);
     at->register_command(
         AT_SNAPSHOT,
         AT_SNAPSHOT_HELP_TEXT,

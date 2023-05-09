@@ -44,10 +44,10 @@ bool ei_inertial_sensor_init(void)
         return false;
     }
 
-    AccGyr.Set_X_ODR(104.0f);
+    AccGyr.Set_X_ODR(208.0f);
     AccGyr.Set_X_FS(2);
 
-    AccGyr.Set_G_ODR(104.0f);
+    AccGyr.Set_G_ODR(208.0f);
     AccGyr.Set_G_FS(2000);
 
     ei_add_sensor_to_fusion_list(inertial_sensor);
@@ -55,8 +55,7 @@ bool ei_inertial_sensor_init(void)
 }
 
 float *ei_fusion_inertial_sensor_read_data(int n_samples)
-{
-
+{    
     AccGyr.Get_X_DRDY_Status(&acceleroStatus);
     if (acceleroStatus == 1) {
         int32_t acceleration[3];
@@ -66,6 +65,12 @@ float *ei_fusion_inertial_sensor_read_data(int n_samples)
         imu_data[1] = (float)acceleration[1] * CONVERT_G_TO_MS2 / 1000.0f;
         imu_data[2] = (float)acceleration[2] * CONVERT_G_TO_MS2 / 1000.0f;
     }
+    else {
+        ei_printf("ERR accelerometer not ready!\n");
+        imu_data[0] = 0.0f;
+        imu_data[1] = 0.0f;
+        imu_data[2] = 0.0f;
+    }
 
     AccGyr.Get_G_DRDY_Status(&gyroStatus);
     if (n_samples > 3 && gyroStatus == 1) {
@@ -73,7 +78,13 @@ float *ei_fusion_inertial_sensor_read_data(int n_samples)
         AccGyr.Get_G_Axes(rotation);
         imu_data[3] = (float)rotation[0] / 32768.0;
         imu_data[4] = (float)rotation[1] / 32768.0;
-        imu_data[5] = (float)rotation[2] / 32768.0;       
+        imu_data[5] = (float)rotation[2] / 32768.0;
+    }
+    else {
+        ei_printf("ERR gyroscope not ready!\n");
+        imu_data[3] = 0.0f;
+        imu_data[4] = 0.0f;
+        imu_data[5] = 0.0f;
     }
 
 #ifdef EI_DEBUG

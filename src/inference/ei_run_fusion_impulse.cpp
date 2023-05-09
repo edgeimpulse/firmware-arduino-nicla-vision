@@ -54,11 +54,11 @@ static int samples_wr_index = 0;
  */
 bool samples_callback(const void *raw_sample, uint32_t raw_sample_size)
 {
-    if(state == INFERENCE_STOPPED) {
+    if (state == INFERENCE_STOPPED) {
         // see: sample_timer_callback in ei_inertial_sensor.cpp why we have to return true
         return true;
     }
-    else if(state != INFERENCE_SAMPLING) {
+    else if (state != INFERENCE_SAMPLING) {
         // don't collect samples if we are not in SAMPLING state
         return false;
     }
@@ -67,10 +67,10 @@ bool samples_callback(const void *raw_sample, uint32_t raw_sample_size)
 
     for(int i = 0; i < (int)(raw_sample_size / sizeof(float)); i++) {
         samples_circ_buff[samples_wr_index++] = sample[i];
-        if(samples_wr_index >= samples_per_inference) {
+        if (samples_wr_index >= samples_per_inference) {
             state = INFERENCE_DATA_READY;
         }
-        if(samples_wr_index > EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE) {
+        if (samples_wr_index > EI_CLASSIFIER_DSP_INPUT_FRAME_SIZE) {
             /* start from beginning of the circular buffer */
             samples_wr_index = 0;
         }
@@ -98,7 +98,7 @@ void ei_run_impulse(void)
             // nothing to do
             return;
         case INFERENCE_WAITING:
-            if(ei_read_timer_ms() > (last_inference_ts + 2000)) {
+            if (ei_read_timer_ms() > (last_inference_ts + 2000)) {
                 state = INFERENCE_SAMPLING;
                 ei_fusion_sample_start(&samples_callback, EI_CLASSIFIER_INTERVAL_MS);
                 return;
@@ -134,7 +134,7 @@ void ei_run_impulse(void)
     // run the impulse: DSP, neural network and the Anomaly algorithm
     ei_impulse_result_t result = { 0 };
     EI_IMPULSE_ERROR ei_error;
-    if(continuous_mode == true) {
+    if (continuous_mode == true) {
         ei_error = run_classifier_continuous(&signal, &result, debug_mode);
     }
     else {
@@ -146,8 +146,8 @@ void ei_run_impulse(void)
         return;
     }
 
-    if(continuous_mode == true) {
-        if(++print_results >= (EI_CLASSIFIER_SLICES_PER_MODEL_WINDOW >> 1)) {
+    if (continuous_mode == true) {
+        if (++print_results >= (EI_CLASSIFIER_SLICES_PER_MODEL_WINDOW >> 1)) {
             display_results(&result);
             print_results = 0;
         }
@@ -156,7 +156,7 @@ void ei_run_impulse(void)
         display_results(&result);
     }
 
-    if(continuous_mode == true) {
+    if (continuous_mode == true) {
         state = INFERENCE_SAMPLING;
     }
     else {
@@ -226,7 +226,7 @@ void ei_start_impulse(bool continuous, bool debug, bool use_max_uart_speed)
 
 void ei_stop_impulse(void) 
 {
-    if(state != INFERENCE_STOPPED) {
+    if (state != INFERENCE_STOPPED) {
         ei_printf("Inferencing stopped by user\r\n");
         // EiDevice.set_state(eiStateFinished);
         /* reset samples buffer */
