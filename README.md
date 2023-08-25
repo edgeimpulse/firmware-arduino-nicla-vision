@@ -27,17 +27,44 @@ _Installing Arduino IDE is a requirement only for Windows users. macOS and Linux
 
 ## Building the application
 
-1. Build the application:
+###  macOS and Linux
+
+* Build the application:
 
     ```
     ./arduino-build.sh --build
     ```
 
-1. Flash the application:
+* Flash the application:
 
     ```
     ./arduino-build.sh --flash
     ```
+
+* Build and flash:
+    ```
+    ./arduino-build.sh --all
+    ```
+
+###  Windows
+
+* Build the application:
+
+    ```
+    ./arduino-win-build.bat --build
+    ```
+
+* Flash the application:
+
+    ```
+    ./arduino-win-build.bat --flash
+    ```
+
+* Build and flash:
+    ```
+    ./arduino-win-build.bat --all
+    ```
+
 
 ### Arduino IDE
 
