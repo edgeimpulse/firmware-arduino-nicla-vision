@@ -71,8 +71,8 @@ IF %ERRORLEVEL% NEQ 0 (
 :AFTERINSTALLINERTIAL
 
 :: define and include
-set DEFINE=-DMBED_HEAP_STATS_ENABLED=1 -DMBED_STACK_STATS_ENABLED=1 -O3 -g3 -DEI_SENSOR_AQ_STREAM=FILE -DEIDSP_QUANTIZE_FILTERBANK=0 -DEI_CLASSIFIER_SLICES_PER_MODEL_WINDOW=4 -DEIDSP_USE_CMSIS_DSP=1 -DEIDSP_LOAD_CMSIS_DSP_SOURCES=1 -DEI_CLASSIFIER_TFLITE_ENABLE_CMSIS_NN=1
-set INCLUDE=-I.\\src\\ -I.\\src\\model-parameters\\ -I.\\src\\inference\\ -I.\\src\\ingestion-sdk-c\\ -I.\\src\\ingestion-sdk-c\\inc\\signing\\ -I.\\src\\ingestion-sdk-platform\\nicla-vision\\ -I.\\src\\sensors\\ -I.\\src\\sensors\\ -I.\\src\\QCBOR\\inc\\ -I.\\src\\QCBOR\\src\\ -I.\\src\\mbedtls_hmac_sha256_sw\\ -I.\\src\\firmware-sdk\\ -I.\\src\\firmware-sdk\\at-server\\
+set DEFINE=-DMBED_HEAP_STATS_ENABLED=1 -DMBED_STACK_STATS_ENABLED=1 -O3 -g3 -DEIDSP_QUANTIZE_FILTERBANK=0 -DEI_CLASSIFIER_SLICES_PER_MODEL_WINDOW=4 -DEIDSP_USE_CMSIS_DSP=1 -DEIDSP_LOAD_CMSIS_DSP_SOURCES=1 -DEI_CLASSIFIER_TFLITE_ENABLE_CMSIS_NN=1
+set INCLUDE=-I.\\src\\ -I.\\src\\model-parameters\\ -I.\\src\\inference\\ -I.\\src\\ingestion-sdk-c\\ -I.\\src\\ingestion-sdk-c\\inc\\signing\\ -I.\\src\\ingestion-sdk-platform\\nicla-vision\\ -I.\\src\\sensors\\ -I.\\src\\sensors\\ -I.\\src\\mbedtls_hmac_sha256_sw\\ -I.\\src\\firmware-sdk\\ -I.\\src\\firmware-sdk\\at-server\\
 
 rem CLI v0.14 updates the name of this to --build-property
 set BUILD_PROPERTIES_FLAG=--build-property

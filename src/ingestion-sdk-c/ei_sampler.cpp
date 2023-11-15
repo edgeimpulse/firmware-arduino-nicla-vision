@@ -57,7 +57,6 @@ static size_t ei_write(const void *buffer, size_t size, size_t count, EI_SENSOR_
         write_word_buf[write_addr&0x7] = *((char *)buffer++);
 
         if((++write_addr & 0x07) == 0x00) {
-            //mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr - 4) + headerOffset, 4);
             mem->write_sample_data((const uint8_t*)write_word_buf, (write_addr - 8) + headerOffset, 8);
         }
     }
