@@ -5,7 +5,7 @@ REM go to the folder where this bat script is located
 cd /d %~dp0
 
 set /a EXPECTED_CLI_MAJOR=0
-set /a EXPECTED_CLI_MINOR=18
+set /a EXPECTED_CLI_MINOR=33
 
 set ARDUINO_CORE=arduino:mbed_nicla
 set BOARD=arduino:mbed_nicla:nicla_vision

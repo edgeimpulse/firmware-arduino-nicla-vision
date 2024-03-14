@@ -178,31 +178,7 @@ void ei_run_impulse(void)
     }
     ea_free(snapshot_buf);
 
-    // print the predictions
-    ei_printf("Predictions (DSP: %d ms., Classification: %d ms., Anomaly: %d ms.): \n",
-                result.timing.dsp, result.timing.classification, result.timing.anomaly);
-#if EI_CLASSIFIER_OBJECT_DETECTION == 1
-    bool bb_found = result.bounding_boxes[0].value > 0;
-    for (size_t ix = 0; ix < EI_CLASSIFIER_OBJECT_DETECTION_COUNT; ix++) {
-        auto bb = result.bounding_boxes[ix];
-        if (bb.value == 0) {
-            continue;
-        }
-        ei_printf("    %s (%f) [ x: %u, y: %u, width: %u, height: %u ]\n", bb.label, bb.value, bb.x, bb.y, bb.width, bb.height);
-    }
-    if (!bb_found) {
-        ei_printf("    No objects found\n");
-    }
-#else
-    for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
-        ei_printf("    %s: %.5f\n", result.classification[ix].label,
-                                    result.classification[ix].value);
-    }
-
-#if EI_CLASSIFIER_HAS_ANOMALY == 1
-        ei_printf("    anomaly score: %.3f\n", result.anomaly);
-#endif
-#endif
+    display_results(&result);
 
     if (debug_mode) {
         ei_printf("\r\n----------------------------------\r\n");
@@ -227,7 +203,7 @@ void ei_start_impulse(bool continuous, bool debug, bool use_max_uart_speed)
     EiDeviceNiclaVision* dev = static_cast<EiDeviceNiclaVision*>(EiDeviceNiclaVision::get_device());
     EiCameraNiclaVision *camera = static_cast<EiCameraNiclaVision*>(EiCameraNiclaVision::get_camera());
 
-    // check if minimum suitable sensor resolution is the same as 
+    // check if minimum suitable sensor resolution is the same as
     // desired snapshot resolution
     // if not we need to resize later
     fb_resolution = camera->search_resolution(snapshot_resolution.width, snapshot_resolution.height);

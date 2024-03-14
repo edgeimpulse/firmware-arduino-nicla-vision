@@ -48,22 +48,6 @@ static uint64_t last_inference_ts = 0;
 static bool continuous_mode = false;
 static bool debug_mode = false;
 
-static void display_results(ei_impulse_result_t* result)
-{
-    ei_printf("Predictions (DSP: %d ms., Classification: %d ms., Anomaly: %d ms.): \n",
-        result->timing.dsp, result->timing.classification, result->timing.anomaly);
-    for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
-        ei_printf("    %s: \t", result->classification[ix].label);
-        ei_printf_float(result->classification[ix].value);
-        ei_printf("\r\n");
-    }
-#if EI_CLASSIFIER_HAS_ANOMALY == 1
-    ei_printf("    anomaly score: ");
-    ei_printf_float(result->anomaly);
-    ei_printf("\r\n");
-#endif
-}
-
 void ei_run_impulse(void)
 {
 
@@ -177,10 +161,10 @@ void ei_start_impulse(bool continuous, bool debug, bool use_max_uart_speed)
     }
 
     ei_stop_impulse();
-    
+
 }
 
-void ei_stop_impulse(void) 
+void ei_stop_impulse(void)
 {
     if(state != INFERENCE_STOPPED) {
         ei_printf("Inferencing stopped by user\r\n");
