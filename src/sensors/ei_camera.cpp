@@ -34,6 +34,8 @@
 
 #include "gc2145.h"
 
+#include <ea_malloc.h>
+
 #define ALIGN_PTR(p,a)   ((p & (a-1)) ?(((uintptr_t)p + a) & ~(uintptr_t)(a-1)) : p)
 
 GC2145 galaxyCore;
@@ -44,7 +46,8 @@ ei_device_snapshot_resolutions_t frame_size;
 
 static bool is_initialised = false;
 static uint8_t *ei_camera_frame_mem = NULL;
-static uint8_t *ei_camera_frame_buffer = NULL; // 32-byte aligned
+static uint8_t *ei_camera_framebuffer = NULL;
+static uint8_t *snapshot_buffer = NULL;
 
 #include "mbed.h"
  static void print_memory_info2() {
@@ -121,17 +124,37 @@ bool EiCameraNiclaVision::init(uint16_t width, uint16_t height)
         return false;
     }
 
-    is_initialised = true;
-
     ei_sleep(100);
+
+    // the camera framebuffer, in RGB565 format
+    ei_camera_frame_mem = (uint8_t *)ei_malloc(EI_CAMERA_RAW_FRAME_BUFFER_COLS * EI_CAMERA_RAW_FRAME_BUFFER_ROWS * EI_CAMERA_RAW_FRAME_BYTE_SIZE + 32 /*alignment*/);
+    if(ei_camera_frame_mem == NULL) {
+        ei_printf("ERR: Failed to create ei_camera_frame_mem\r\n");
+        return false;
+    }
+    ei_camera_framebuffer = (uint8_t *)ALIGN_PTR((uintptr_t)ei_camera_frame_mem, 32);
+    fb.setBuffer(ei_camera_framebuffer);
+
+    // the EI snapshot buffer, in RGB888 format
+    snapshot_buffer = (uint8_t*)ea_malloc(EI_CAMERA_RAW_FRAME_BUFFER_COLS * EI_CAMERA_RAW_FRAME_BUFFER_ROWS * 3 + 32);
+    if(snapshot_buffer == NULL) {
+        ei_printf("ERR: Failed to create snapshot_buf\r\n");
+        return false;
+    }
+    snapshot_buffer = (uint8_t *)ALIGN_PTR((uintptr_t)snapshot_buffer, 32);
+
+    is_initialised = true;
 
     return true;
 }
 
 bool EiCameraNiclaVision::deinit()
 {
-    ei_camera_frame_mem = NULL;
-    ei_camera_frame_buffer = NULL;
+    delay(100);
+    ei_free(ei_camera_frame_mem);
+    ea_free(snapshot_buffer);
+    ei_camera_framebuffer = NULL;
+    snapshot_buffer = NULL;
 
     is_initialised = false;
     return true;
@@ -141,32 +164,27 @@ bool EiCameraNiclaVision::ei_camera_capture_rgb888_packed_big_endian(
     uint8_t *image,
     uint32_t image_size)
 {
-    ei_camera_frame_mem = (uint8_t *)ei_malloc(EI_CAMERA_RAW_FRAME_BUFFER_COLS * EI_CAMERA_RAW_FRAME_BUFFER_ROWS * EI_CAMERA_RAW_FRAME_BYTE_SIZE + 32 /*alignment*/);
-    if(ei_camera_frame_mem == NULL) {
-        ei_printf("ERR: Failed to create ei_camera_frame_mem\r\n");
-        return false;
-    }
-    ei_camera_frame_buffer = (uint8_t *)ALIGN_PTR((uintptr_t)ei_camera_frame_mem, 32);
-    fb.setBuffer(ei_camera_frame_buffer);
-
     if (cam.grabFrame(fb, 100) != 0) {
         ei_printf("ERR: Camera capture failed\n");
-        ei_free(ei_camera_frame_mem);
+        deinit();
         return false;
     }
 
-    bool converted = RBG565ToRGB888(ei_camera_frame_buffer, image, cam.frameSize());
+    bool converted = RBG565ToRGB888(ei_camera_framebuffer, image, cam.frameSize());
 
     if(!converted){
         ei_printf("ERR: Conversion failed\n");
-        ei_free(ei_camera_frame_mem);
+        deinit();
         return false;
     }
-    ei_free(ei_camera_frame_mem);
-
     return true;
 }
 
+bool EiCameraNiclaVision::get_fb_ptr(uint8_t** fb_ptr)
+{
+    *fb_ptr = snapshot_buffer;
+    return true;
+}
 
 bool EiCameraNiclaVision::ei_camera_capture_jpeg(uint8_t **image, uint32_t *image_size)
 {

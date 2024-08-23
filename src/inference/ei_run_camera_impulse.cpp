@@ -36,8 +36,6 @@
 #include "ei_device_nicla_vision.h"
 #include "ei_run_impulse.h"
 
-#include <ea_malloc.h>
-
 #define DWORD_ALIGN_PTR(a)   ((a & 0x3) ?(((uintptr_t)a + 0x4) & ~(uintptr_t)0x3) : a)
 #define ALIGN_PTR(p,a)   ((p & (a-1)) ?(((uintptr_t)p + a) & ~(uintptr_t)(a-1)) : p)
 
@@ -105,16 +103,13 @@ void ei_run_impulse(void)
             break;
     }
 
-    snapshot_buf = (uint8_t*)ea_malloc(snapshot_buf_size + 32);
-    snapshot_buf = (uint8_t *)ALIGN_PTR((uintptr_t)snapshot_buf, 32);
-
+    EiCameraNiclaVision *camera = static_cast<EiCameraNiclaVision*>(EiCameraNiclaVision::get_camera());
+    camera->get_fb_ptr(&snapshot_buf);
     // check if allocation was successful
     if(snapshot_buf == nullptr) {
-        ei_printf("ERR: Failed to allocate snapshot buffer!\n");
+        ei_printf("ERR: Failed to get snapshot buffer!\n");
         return;
     }
-
-    EiCameraNiclaVision *camera = static_cast<EiCameraNiclaVision*>(EiCameraNiclaVision::get_camera());
 
     ei_printf("Taking photo...\n");
 
@@ -173,10 +168,9 @@ void ei_run_impulse(void)
     EI_IMPULSE_ERROR ei_error = run_classifier(&signal, &result, false);
     if (ei_error != EI_IMPULSE_OK) {
         ei_printf("ERR: Failed to run impulse (%d)\n", ei_error);
-        ea_free(snapshot_buf);
+        camera->deinit();
         return;
     }
-    ea_free(snapshot_buf);
 
     display_results(&result);
 
@@ -217,7 +211,7 @@ void ei_start_impulse(bool continuous, bool debug, bool use_max_uart_speed)
         return;
     }
 
-    snapshot_buf_size = fb_resolution.width * fb_resolution.height * 3;
+    snapshot_buf_size = fb_resolution.width * fb_resolution.height * ei::image::processing::RGB888_B_SIZE;
 
     // summary of inferencing settings (from model_metadata.h)
     ei_printf("Inferencing settings:\n");
@@ -261,6 +255,8 @@ void ei_start_impulse(bool continuous, bool debug, bool use_max_uart_speed)
 
 void ei_stop_impulse(void)
 {
+    EiCameraNiclaVision *camera = static_cast<EiCameraNiclaVision*>(EiCameraNiclaVision::get_camera());
+    camera->deinit();
     state = INFERENCE_STOPPED;
 }
 

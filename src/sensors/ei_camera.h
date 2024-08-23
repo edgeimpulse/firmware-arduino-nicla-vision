@@ -49,6 +49,7 @@ public:
     bool deinit();
     bool ei_camera_capture_jpeg(uint8_t **image, uint32_t *image_size);
     bool ei_camera_capture_rgb888_packed_big_endian(uint8_t *image, uint32_t image_size);
+    bool get_fb_ptr(uint8_t** fb_ptr);
     bool ei_camera_jpeg_to_rgb888(uint8_t *jpeg_image, uint32_t jpeg_image_size,
                                   uint8_t *rgb88_image);
     bool set_resolution(const ei_device_snapshot_resolutions_t res);
