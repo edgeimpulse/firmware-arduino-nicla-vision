@@ -249,6 +249,8 @@ void ei_start_impulse(bool continuous, bool debug, bool use_max_uart_speed)
         ei_sleep(100);
     }
 
+    run_classifier_init();
+
     while(!ei_user_invoke_stop_lib()) {
         ei_run_impulse();
         ei_sleep(1);
@@ -269,6 +271,7 @@ void ei_stop_impulse(void)
 {
     EiCameraNiclaVision *camera = static_cast<EiCameraNiclaVision*>(EiCameraNiclaVision::get_camera());
     camera->deinit();
+    run_classifier_deinit();
     state = INFERENCE_STOPPED;
 }
 
